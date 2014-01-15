@@ -11,10 +11,12 @@ var sentinel1
 var sentinel2
 
 //kills any old redis instances that might be sticking around and cauing problems
-function killOldRedises(){
+function killOldRedises(callback){
   exec("ps aux | grep -ie redis | awk '{print $2}' | xargs kill -9", function(error, stdout, stderr){
     console.log('killOldRedises stdout: ' + stdout);
     console.log('killOldRedises stderr: ' + stderr);
+    callback();
+  });
 }
 
 function startRedis0(){
@@ -101,21 +103,35 @@ function startSentinel2(){
   });
 }
 
-killOldRedises();
-startRedis0();
-startSentinel0();
-startRedis1();
-startSentinel1();
-startRedis2();
-startSentinel2();
 
 var clients = {};
 
 function startTheFun(){
   //create client connecting to sentinels
-  clients['0'] = sentinelClient.createClient(26380, '127.0.0.1');
+  //clients['0'] = sentinelClient.createClient(26380, '127.0.0.1');
+  
+  //clients['2'] = sentinelClient.createClient(26382, '127.0.0.1');
+  killOldRedises(startAllRedises);
+  
+}
+
+function startAllRedises(){
+  startRedis0();
+  startSentinel0();
+  startRedis1();
+  startSentinel1();
+  startRedis2();
+  startSentinel2();
+
+  setTimeout(storeData, 15000);
+}
+
+function storeData(){
   clients['1'] = sentinelClient.createClient(26381, '127.0.0.1');
-  clients['2'] = sentinelClient.createClient(26382, '127.0.0.1');
+  clients['1'].set("foo", "bar");
+  clients['1'].on('error', function(err){
+    console.log(err);
+  });
 
   setTimeout(killSomeStuff, 1000);
 }
@@ -123,9 +139,28 @@ function startTheFun(){
 function killSomeStuff(){
   redis0.kill();
   sentinel0.kill();
+
+  setTimeout(makeGetRequest, 100);
 }
 
-setTimeout(startTheFun, 10000);
+function makeGetRequest(){
+    clients['1'].get('foo', function(err, data){
+    console.log('A REPLY STAND OUT IN TEH CRAP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+    if(err){
+      console.log(err);
+    }
+    console.log(data);
+  });
+}
+
+function bringStuffBackUp(){
+  
+
+  //startRedis0();
+  //startSentinel0();
+}
+
+startTheFun();
 
 module.exports = clients;
 //setTimeout(function(){
